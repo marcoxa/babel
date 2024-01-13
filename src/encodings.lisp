@@ -72,6 +72,7 @@
    (ambiguous
     :initarg :ambiguous :reader ambiguous-encoding-p :initform nil)))
 
+
 ;;; I'm too lazy to write all the identical limits twice.
 (defmethod initialize-instance :after ((enc character-encoding)
                                        &key literal-char-code-limit)
@@ -105,6 +106,7 @@ encodings.  This list does not include aliases."
   "Special variable used to determine the default character
 encoding.")
 
+
 (defun get-character-encoding (name)
   "Lookups the character encoding denoted by the keyword symbol
 NAME.  Signals an error if one is not found.  If NAME is already
@@ -116,8 +118,10 @@ a CHARACTER-ENCONDING object, it is returned unmodified."
   (or (gethash name *character-encodings*)
       (error "Unknown character encoding: ~S" name)))
 
+
 (defmethod ambiguous-encoding-p ((encoding symbol))
   (ambiguous-encoding-p (get-character-encoding encoding)))
+
 
 (defun notice-character-encoding (enc)
   (pushnew (enc-name enc) *supported-character-encodings*)
@@ -125,10 +129,12 @@ a CHARACTER-ENCONDING object, it is returned unmodified."
     (setf (gethash kw *character-encodings*) enc))
   (enc-name enc))
 
+
 (defmacro define-character-encoding (name docstring &body options)
   `(notice-character-encoding
     (make-instance 'character-encoding :name ,name ,@options
                    :documentation ,docstring)))
+
 
 ;;;; Mappings
 
@@ -152,6 +158,7 @@ a CHARACTER-ENCONDING object, it is returned unmodified."
                                   ,unit-size-in-bytes))
                    (the fixnum end))))))
 
+
 ;;; Useful to develop new encodings incrementally starting with octet
 ;;; and code-unit counters.
 (defun make-dummy-coder (sg st ds dt)
@@ -160,6 +167,7 @@ a CHARACTER-ENCONDING object, it is returned unmodified."
      (declare (ignore src s e dest i))
      (error "this encoder/decoder hasn't been implemented yet")))
 
+
 ;;; TODO: document here
 ;;;
 ;;; ENCODER -- (lambda (src-getter src-type dest-setter dest-type) ...)
@@ -167,6 +175,7 @@ a CHARACTER-ENCONDING object, it is returned unmodified."
 ;;;
 ;;; OCTET-COUNTER -- (lambda (getter type) ...)
 ;;; CODE-POINT-COUNTER -- (lambda (getter type) ...)
+
 (defclass abstract-mapping ()
   ((encoder-factory :accessor encoder-factory :initform 'make-dummy-coder)
    (decoder-factory :accessor decoder-factory :initform 'make-dummy-coder)
@@ -174,6 +183,7 @@ a CHARACTER-ENCONDING object, it is returned unmodified."
                           :initform 'make-fixed-width-counter)
    (code-point-counter-factory :accessor code-point-counter-factory
                                :initform 'make-fixed-width-counter)))
+
 
 ;;; TODO: document these
 ;;;
@@ -184,19 +194,24 @@ a CHARACTER-ENCONDING object, it is returned unmodified."
 ;;; CODE-POINT-COUNTER -- (lambda (seq start end max-chars) ...)
 ;;;                        => N-CHARS NEW-END
 ;;;   (important: describe NEW-END)
+
 (defclass concrete-mapping ()
   ((encoder :accessor encoder)
    (decoder :accessor decoder)
    (octet-counter :accessor octet-counter)
    (code-point-counter :accessor code-point-counter)))
 
+
 (defparameter *abstract-mappings* (make-hash-table :test 'eq))
+
 
 (defun get-abstract-mapping (encoding)
   (gethash encoding *abstract-mappings*))
 
+
 (defun (setf get-abstract-mapping) (value encoding)
   (setf (gethash encoding *abstract-mappings*) value))
+
 
 (defun %register-mapping-part (encoding slot-name fn)
   (let ((mapping (get-abstract-mapping encoding)))
@@ -205,6 +220,7 @@ a CHARACTER-ENCONDING object, it is returned unmodified."
       (setf (get-abstract-mapping encoding) mapping))
     (setf (slot-value mapping slot-name) fn)))
 
+
 ;;; See enc-*.lisp for example usages of these 4 macros.
 
 (defmacro define-encoder (encoding (sa st da dt) &body body)
@@ -212,20 +228,24 @@ a CHARACTER-ENCONDING object, it is returned unmodified."
                            (named-lambda encoder (,sa ,st ,da ,dt)
                              ,@body)))
 
+
 (defmacro define-decoder (encoding (sa st da dt) &body body)
   `(%register-mapping-part ,encoding 'decoder-factory
                            (named-lambda decoder (,sa ,st ,da ,dt)
                              ,@body)))
+
 
 (defmacro define-octet-counter (encoding (acc type) &body body)
   `(%register-mapping-part ,encoding 'octet-counter-factory
                            (named-lambda octet-counter-factory (,acc ,type)
                              ,@body)))
 
+
 (defmacro define-code-point-counter (encoding (acc type) &body body)
   `(%register-mapping-part ,encoding 'code-point-counter-factory
                            (named-lambda code-point-counter (,acc ,type)
                              ,@body)))
+
 
 (defun instantiate-encoder (encoding am octet-seq-getter octet-seq-type
                             code-point-seq-setter code-point-seq-type)
@@ -236,6 +256,7 @@ a CHARACTER-ENCONDING object, it is returned unmodified."
            code-point-seq-setter
            code-point-seq-type))
 
+
 (defun instantiate-decoder (encoding am octet-seq-getter octet-seq-type
                             code-point-seq-setter code-point-seq-type)
   (declare (ignore encoding))
@@ -245,12 +266,14 @@ a CHARACTER-ENCONDING object, it is returned unmodified."
            code-point-seq-setter
            code-point-seq-type))
 
+
 (defun instantiate-code-point-counter (encoding am octet-seq-getter
                                        octet-seq-type)
   (declare (ignore encoding))
   (funcall (code-point-counter-factory am)
            octet-seq-getter
            octet-seq-type))
+
 
 (defun instantiate-octet-counter (encoding am code-point-seq-getter
                                   code-point-seq-type)
@@ -260,6 +283,7 @@ a CHARACTER-ENCONDING object, it is returned unmodified."
       (funcall (octet-counter-factory am)
                code-point-seq-getter
                code-point-seq-type)))
+
 
 ;;; Expands into code generated by the available abstract mappings
 ;;; that will be compiled into concrete mappings.  This is used in
@@ -271,11 +295,17 @@ a CHARACTER-ENCONDING object, it is returned unmodified."
 ;;; appropriate code for the concrete mappings. These functions are
 ;;; then saved in their respective slots of the CONCRETE-MAPPING
 ;;; object.
+
 (defmacro instantiate-concrete-mappings
-    (&key (encodings (hash-table-keys *abstract-mappings*))
+    (&key
+     (encodings (hash-table-keys *abstract-mappings*))
      (optimize '((speed 3) (debug 0) (compilation-speed 0)))
-     octet-seq-getter octet-seq-setter octet-seq-type
-     code-point-seq-getter code-point-seq-setter code-point-seq-type
+     octet-seq-getter
+     octet-seq-setter
+     octet-seq-type
+     code-point-seq-getter
+     code-point-seq-setter
+     code-point-seq-type
      (instantiate-decoders t))
   `(let ((ht (make-hash-table :test 'eq)))
      (declare (optimize ,@optimize)
@@ -314,13 +344,16 @@ a CHARACTER-ENCONDING object, it is returned unmodified."
                   (notice-mapping ,encoding-name cm))))
      ht))
 
+
 ;;; debugging stuff
 
 #-(and)
 (defun pprint-instantiate-concrete-mappings
-    (&key (encodings (hash-table-keys *abstract-mappings*))
+    (&key
+     (encodings (hash-table-keys *abstract-mappings*))
      (optimize '((debug 3) (safety 3)))
-     (octet-seq-setter 'ub-set) (octet-seq-getter 'ub-get)
+     (octet-seq-setter 'ub-set)
+     (octet-seq-getter 'ub-get)
      (octet-seq-type '(simple-array (unsigned-byte 8) (*)))
      (code-point-seq-setter 'string-set)
      (code-point-seq-getter 'string-get)
@@ -341,16 +374,21 @@ a CHARACTER-ENCONDING object, it is returned unmodified."
         :code-point-seq-type ,code-point-seq-type))))
   (values))
 
+
 ;;;; Utilities used in enc-*.lisp
 
 (defconstant +default-substitution-code-point+ #x1a
-  "Default ASCII substitution character code point used in case of an encoding/decoding error.")
+  "Default ASCII substitution character code point used in case of an
+encoding/decoding error.")
+
 
 ;;; We're converting between objects of the (UNSIGNED-BYTE 8) and
 ;;; (MOD #x110000) types which are aliased here to UB8 and CODE-POINT
 ;;; for convenience.
+
 (deftype ub8 () '(unsigned-byte 8))
 (deftype code-point () '(mod #x110000))
+
 
 ;;; Utility macro around DEFINE-ENCODER that takes care of most of the
 ;;; work need to deal with an 8-bit, fixed-width character encoding.
@@ -361,6 +399,11 @@ a CHARACTER-ENCONDING object, it is returned unmodified."
 ;;; sorts of type declarations.
 ;;;
 ;;; See enc-ascii.lisp for a simple usage example.
+;;;
+;;; Notes:
+;;; 2024-01-13: MA: ok, you did (Luis, that'd be you) get carried
+;;; away, didn't you?
+
 (defmacro define-unibyte-encoder (encoding (code) &body body)
   (with-unique-names (s-getter s-type d-setter d-type
                       src start end dest d-start i di)
@@ -385,7 +428,9 @@ a CHARACTER-ENCONDING object, it is returned unmodified."
                  ,',dest ,',di)
                 finally (return (the fixnum (- ,',di ,',d-start))))))))
 
+
 ;;; The decoder version of the above macro.
+
 (defmacro define-unibyte-decoder (encoding (octet) &body body)
   (with-unique-names (s-getter s-type d-setter d-type
                       src start end dest d-start i di)
@@ -409,6 +454,7 @@ a CHARACTER-ENCONDING object, it is returned unmodified."
                      (block ,',encoding ,@',body)))
                  ,',dest ,',di)
                 finally (return (the fixnum (-  ,',di ,',d-start))))))))
+
 
 ;;;; Error Conditions
 ;;;
@@ -450,17 +496,21 @@ a CHARACTER-ENCONDING object, it is returned unmodified."
 ;;;
 ;;; In any case, this is not for the users to bind and it's not
 ;;; exported from the BABEL package.
+
 (defvar *suppress-character-coding-errors* nil
   "If non-NIL, encoding or decoding errors are suppressed and the
 the current character encoding's default replacement character is
 used.")
 
+
 ;;; All of Babel's error conditions are subtypes of
 ;;; CHARACTER-CODING-ERROR.  This error hierarchy is based on SBCL's.
+
 (define-condition character-coding-error (error)
   ((buffer :initarg :buffer :reader character-coding-error-buffer)
    (position :initarg :position :reader character-coding-error-position)
    (encoding :initarg :encoding :reader character-coding-error-encoding)))
+
 
 (define-condition character-encoding-error (character-coding-error)
   ((code :initarg :code :reader character-encoding-error-code))
@@ -468,6 +518,7 @@ used.")
              (format s "Unable to encode character code point ~A as ~S."
                      (character-encoding-error-code c)
                      (character-coding-error-encoding c)))))
+
 
 (declaim (inline encoding-error))
 (defun encoding-error (code enc buf pos &optional
@@ -477,6 +528,7 @@ used.")
     (error e :encoding enc :buffer buf :position pos :code code))
   sub)
 
+
 (define-condition character-decoding-error (character-coding-error)
   ((octets :initarg :octets :reader character-decoding-error-octets))
   (:report (lambda (c s)
@@ -484,15 +536,18 @@ used.")
                      (character-coding-error-encoding c)
                      (character-coding-error-position c)))))
 
+
 (define-condition end-of-input-in-character (character-decoding-error)
   ()
   (:documentation "Signalled by DECODERs or CODE-POINT-COUNTERs
 of variable-width character encodings."))
 
+
 (define-condition character-out-of-range (character-decoding-error)
   ()
   (:documentation
    "Signalled when the character being decoded is out of range."))
+
 
 (declaim (inline decoding-error))
 (defun decoding-error (octets enc buf pos &optional
@@ -501,3 +556,6 @@ of variable-width character encodings."))
   (unless *suppress-character-coding-errors*
     (error e :octets octets :encoding enc :buffer buf :position pos))
   sub)
+
+;;;; end of file -- encodings.lisp
+
