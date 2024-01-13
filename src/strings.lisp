@@ -24,6 +24,7 @@
 ;;; OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 ;;; DEALINGS IN THE SOFTWARE.
 
+
 (in-package #:babel)
 
 ;;; The usefulness of this string/octets interface of Babel's is very
@@ -36,7 +37,9 @@
 ;;; (it would break expectations about common string operations) and
 ;;; better done with something like Closure's runes.
 
+
 ;;; Can we handle unicode fully?
+
 (eval-when (:compile-toplevel :load-toplevel :execute)
   ;; The EVAL is just here to avoid warnings...
   (case (eval char-code-limit)
@@ -49,8 +52,10 @@
     (t (error "Strange CHAR-CODE-LIMIT (#x~X), bailing out."
               char-code-limit))))
 
+
 ;;; Adapted from Ironclad.  TODO: check if it's worthwhile adding
 ;;; implementation-specific accessors such as SAP-REF-* for SBCL.
+
 (defmacro ub-get (vector index &optional (bytes 1) (endianness :ne))
   (let ((big-endian (member endianness
                             '(:be #+big-endian :ne #+little-endian :re))))
@@ -65,6 +70,7 @@
                                  (* offset 8))
                  collect `(ash (aref ,vector (+ ,index ,offset)) ,shift)))))))
 
+
 (defmacro ub-set (value vector index &optional (bytes 1) (endianness :ne))
   (let ((big-endian (member endianness
                             '(:be #+big-endian :ne #+little-endian :re))))
@@ -75,11 +81,14 @@
                       (ldb (byte 8 ,(* 8 (1- i))) ,value)))
        (values))))
 
+
 (defmacro string-get (string index)
   `(char-code (schar ,string ,index)))
 
+
 (defmacro string-set (code string index)
   `(setf (schar ,string ,index) (code-char ,code)))
+
 
 ;;; SIMPLE-BASE-STRING would also be a subtype of SIMPLE-STRING so we
 ;;; don't use that because on SBCL BASE-CHARs can only hold ASCII.
@@ -93,19 +102,23 @@
   "An alias for CL:CHAR-CODE-LIMIT which might be lower than
 #x110000 on some Lisps.")
 
+
 (deftype unicode-char ()
   "This character type can hold any characters whose CHAR-CODEs
 are less than UNICODE-CHAR-CODE-LIMIT."
   #+lispworks 'lw:simple-char
   #-lispworks 'character)
 
+
 (deftype simple-unicode-string ()
   "Alias for (SIMPLE-ARRAY UNICODE-CHAR (*))."
   '(simple-array unicode-char (*)))
 
+
 (deftype unicode-string ()
   "Alias for (VECTOR UNICODE-CHAR *)."
   '(vector unicode-char *))
+
 
 (defparameter *string-vector-mappings*
   (instantiate-concrete-mappings
@@ -116,6 +129,7 @@ are less than UNICODE-CHAR-CODE-LIMIT."
    :code-point-seq-setter string-set
    :code-point-seq-getter string-get
    :code-point-seq-type simple-unicode-string))
+
 
 #+sbcl
 (defparameter *simple-base-string-vector-mappings*
@@ -129,11 +143,14 @@ are less than UNICODE-CHAR-CODE-LIMIT."
    :code-point-seq-getter string-get
    :code-point-seq-type simple-base-string))
 
+
 ;;; Do we want a more a specific error condition here?
+
 (defun check-vector-bounds (vector start end)
   (unless (<= 0 start end (length vector))
     (error "Invalid start (~A) and end (~A) values for vector of length ~A."
            start end (length vector))))
+
 
 (defmacro with-simple-vector (((v vector) (s start) (e end)) &body body)
   "If VECTOR is a displaced or adjustable array, binds V to the
@@ -151,9 +168,11 @@ shouldn't attempt to modify V."
   #+sbcl
   `(sb-kernel:with-array-data ((,v ,vector) (,s ,start) (,e ,end))
      ,@body)
+
   #+(or cmu scl)
   `(lisp::with-array-data ((,v ,vector) (,s ,start) (,e ,end))
      ,@body)
+
   #+openmcl
   (with-unique-names (offset)
     `(multiple-value-bind (,v ,offset)
@@ -161,12 +180,14 @@ shouldn't attempt to modify V."
        (let ((,s (+ ,start ,offset))
              (,e (+ ,end ,offset)))
          ,@body)))
+
   #+allegro
   (with-unique-names (offset)
     `(excl::with-underlying-simple-vector (,vector ,v ,offset)
        (let ((,e (+ ,end ,offset))
              (,s (+ ,start ,offset)))
          ,@body)))
+
   ;; slow, copying implementation
   #-(or sbcl cmu scl openmcl allegro)
   (once-only (vector)
@@ -175,6 +196,7 @@ shouldn't attempt to modify V."
                   #'call-with-array-data/fast)
               ,vector ,start ,end
               (lambda (,v ,s ,e) ,@body))))
+
 
 #-(or sbcl cmu scl openmcl allegro)
 (progn
@@ -189,16 +211,20 @@ shouldn't attempt to modify V."
             (incf offset index-offset)
             (setf array displaced-to))))
 
+
   (defun call-with-array-data/fast (vector start end fn)
     (multiple-value-bind (data offset)
         (array-data-and-offset vector)
       (funcall fn data (+ offset start) (+ offset end))))
 
+
   (defun call-with-array-data/copy (vector start end fn)
     (funcall fn (replace (make-array (- end start) :element-type
                                      (array-element-type vector))
                          vector :start2 start :end2 end)
-             0 (- end start))))
+             0 (- end start)))
+  ) ; PROGN
+
 
 (defmacro with-checked-simple-vector (((v vector) (s start) (e end)) &body body)
   "Like WITH-SIMPLE-VECTOR but bound-checks START and END."
@@ -208,19 +234,33 @@ shouldn't attempt to modify V."
        (with-simple-vector ((,v ,vector) (,s ,start) (,e ,e))
          ,@body))))
 
+
 ;;; Future features these functions should have:
 ;;;
 ;;;   * null-terminate
 ;;;   * specify target vector/string + offset
 ;;;   * documentation :)
 
-(declaim (inline octets-to-string string-to-octets string-size-in-octets
-                 vector-size-in-chars concatenate-strings-to-octets
+(declaim (inline octets-to-string
+                 string-to-octets
+                 string-size-in-octets
+                 vector-size-in-chars
+                 concatenate-strings-to-octets
                  bom-vector))
 
-(defun octets-to-string (vector &key (start 0) end
+(defun octets-to-string (vector
+                         &key
+                         (start 0) end
                          (errorp (not *suppress-character-coding-errors*))
                          (encoding *default-character-encoding*))
+  "Given a octet VECTOR, returns a (decoded) Common Lisp string.
+
+The octet vector RESULT is obtained using the ENCODING, which defaults
+to *DEFAULT-CHARACTER-ENCODING*.
+
+See Also:
+*DEFAULT-CHARACTER-ENCODING* and *SUPPRESS-CHARACTER-CODING-ERRORS*.
+"
   (check-type vector (vector (unsigned-byte 8)))
   (with-checked-simple-vector ((vector vector) (start start) (end end))
     (declare (type (simple-array (unsigned-byte 8) (*)) vector))
@@ -233,6 +273,20 @@ shouldn't attempt to modify V."
         (let ((string (make-string size :element-type 'unicode-char)))
           (funcall (decoder mapping) vector start new-end string 0)
           string)))))
+
+
+(defun decode-octets (vector
+                      &rest keys
+                      &key
+                      (encoding *default-character-encoding*)
+                      (start 0) end
+                      (use-bom :default)
+                      (errorp (not
+                               *suppress-character-coding-errors*)))
+  "Alias for OCTETS-TO-STRING."
+  (declare (ignorable encoding start end use-bom errorp))
+  (apply #'octets-to-string vector keys))
+
 
 (defun bom-vector (encoding use-bom)
   (check-type use-bom (member :default t nil))
@@ -248,9 +302,21 @@ shouldn't attempt to modify V."
               (values (enc-bom-encoding enc))
               #())))))
 
-(defun string-to-octets (string &key (encoding *default-character-encoding*)
-                         (start 0) end (use-bom :default)
+
+(defun string-to-octets (string
+                         &key
+                         (encoding *default-character-encoding*)
+                         (start 0) end
+                         (use-bom :default)
                          (errorp (not *suppress-character-coding-errors*)))
+  "Given a Common Lisp STRING, returns a (encoded) vector of octets.
+
+The octet vector RESULT is obtained using the ENCODING, which defaults
+to *DEFAULT-CHARACTER-ENCODING*.
+
+See Also:
+*DEFAULT-CHARACTER-ENCODING* and *SUPPRESS-CHARACTER-CODING-ERRORS*.
+"
   (declare (optimize (speed 3) (safety 2)))
   (let ((*suppress-character-coding-errors* (not errorp)))
     (etypecase string
@@ -278,6 +344,7 @@ shouldn't attempt to modify V."
          (funcall (the function (encoder mapping))
                   string start end result bom-length)
          result))
+
       (string
        ;; FIXME: we shouldn't really need that coercion to UNICODE-STRING
        ;; but we kind of because it's declared all over.  To avoid that,
@@ -299,6 +366,20 @@ shouldn't attempt to modify V."
            (funcall (the function (encoder mapping))
                     string start end result bom-length)
            result))))))
+
+
+(defun encode-string (string
+                      &rest keys
+                      &key
+                      (encoding *default-character-encoding*)
+                      (start 0) end
+                      (use-bom :default)
+                      (errorp (not
+                               *suppress-character-coding-errors*)))
+  "Alias for STRING-TO-OCTET."
+  (declare (ignorable encoding start end use-bom errorp))
+  (apply #'string-to-octets string keys))
+
 
 (defun concatenate-strings-to-octets (encoding &rest strings)
   "Optimized equivalent of
@@ -326,9 +407,15 @@ shouldn't attempt to modify V."
                        string start end vector current-index))))
     vector))
 
-(defun string-size-in-octets (string &key (start 0) end (max -1 maxp)
+
+(defun string-size-in-octets (string
+                              &key
+                              (start 0) end
+                              (max -1 maxp)
                               (errorp (not *suppress-character-coding-errors*))
                               (encoding *default-character-encoding*))
+  "Returns the STRING size according to ENCODING."
+
   (check-type string string)
   (with-checked-simple-vector ((string (coerce string 'unicode-string))
                                (start start) (end end))
@@ -338,9 +425,15 @@ shouldn't attempt to modify V."
       (when maxp (assert (plusp max)))
       (funcall (octet-counter mapping) string start end max))))
 
-(defun vector-size-in-chars (vector &key (start 0) end (max -1 maxp)
+
+(defun vector-size-in-chars (vector
+                             &key
+                             (start 0) end
+                             (max -1 maxp)
                              (errorp (not *suppress-character-coding-errors*))
                              (encoding *default-character-encoding*))
+  "Returns the (octets) VECTOR size in characters according to ENCODING."
+
   (check-type vector (vector (unsigned-byte 8)))
   (with-checked-simple-vector ((vector vector) (start start) (end end))
     (declare (type (simple-array (unsigned-byte 8) (*)) vector))
@@ -349,5 +442,12 @@ shouldn't attempt to modify V."
       (when maxp (assert (plusp max)))
       (funcall (code-point-counter mapping) vector start end max))))
 
-(declaim (notinline octets-to-string string-to-octets string-size-in-octets
-                    vector-size-in-chars concatenate-strings-to-octets))
+
+(declaim (notinline octets-to-string
+                    string-to-octets
+                    string-size-in-octets
+                    vector-size-in-chars
+                    concatenate-strings-to-octets))
+
+;;; end of file -- strings.lisp
+
