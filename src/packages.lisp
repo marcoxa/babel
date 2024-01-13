@@ -94,8 +94,8 @@
    ;; general user API
    #:*default-character-encoding*
    #:list-character-encodings
-   #:string-to-octets
-   #:octets-to-string
+   #:string-to-octets #:encode-string
+   #:octets-to-string #:decode-octets
    #:concatenate-strings-to-octets
    #:string-size-in-octets
    #:vector-size-in-chars
