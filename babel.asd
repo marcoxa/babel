@@ -3,6 +3,7 @@
 ;;; babel.asd --- ASDF system definition for Babel.
 ;;;
 ;;; Copyright (C) 2007, Luis Oliveira  <loliveira@common-lisp.net>
+;;; Copyright (C) 2024, Marco Antoniotti  <marcoxa@gmail.com>
 ;;;
 ;;; Permission is hereby granted, free of charge, to any person
 ;;; obtaining a copy of this software and associated documentation
@@ -23,6 +24,8 @@
 ;;; WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 ;;; OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 ;;; DEALINGS IN THE SOFTWARE.
+
+(use-package "ASDF")
 
 (defsystem babel
   :description "Babel, a charset conversion library."
